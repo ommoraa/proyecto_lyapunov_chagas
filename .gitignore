@@ -1,0 +1,27 @@
+# Entorno virtual
+.venv/
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Datos
+data/raw/
+data/clean/
+
+# Modelos y artefactos
+models/
+mlruns/
+
+# Archivos de configuración sensibles
+.env
+*.log
+
+# Archivos de DVC
+*.dvc
+.dvc/
