@@ -10,11 +10,7 @@ __pycache__/
 # Notebooks
 .ipynb_checkpoints/
 
-# Datos
-data/raw/
-data/clean/
-
-# Modelos y artefactos
+# Modelos y artefactos locales
 models/
 mlruns/
 

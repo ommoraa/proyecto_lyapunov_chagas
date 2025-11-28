@@ -1,0 +1,32 @@
+stages:
+  clean_data:
+    cmd: python src/clean_data.py
+    deps:
+      - data/raw/Datos_2024_205.xlsx
+      - src/clean_data.py
+    outs:
+      - data/clean/chagas_clean.csv
+
+  prepare_data:
+    cmd: python src/prepare_data.py
+    deps:
+      - data/clean/chagas_clean.csv
+      - src/prepare_data.py
+    outs:
+      - data/clean/chagas_prepared.csv
+
+  calibrate_seir:
+    cmd: python src/calibrate_seir.py
+    deps:
+      - data/clean/chagas_prepared.csv
+      - src/calibrate_seir.py
+    outs:
+      - models/seir_params.json
+
+  simulate_seir:
+    cmd: python src/simulate_seir.py
+    deps:
+      - models/seir_params.json
+      - src/simulate_seir.py
+    outs:
+      - reports/seir_simulation.csv
