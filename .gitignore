@@ -21,7 +21,3 @@ mlruns/
 # Archivos de configuración sensibles
 .env
 *.log
-
-# Archivos de DVC
-*.dvc
-.dvc/
