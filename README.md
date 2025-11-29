@@ -173,3 +173,6 @@ dvc repro
 https://portalsivigila.ins.gov.co
 
 - Anderson, R. M., & May, R. M. (1991). Infectious diseases of humans: Dynamics and control. Oxford University Press.
+
+## Nota sobre la elaboración del proyecto
+Este proyecto fue elaborado por el autor y contó con asistencia de ChatGPT en la corrección, depuración, estandarización y adaptación del código Python, así como en la organización de notebooks, scripts, documentación técnica y estructuración del pipeline. La responsabilidad final sobre el diseño, decisiones metodológicas y contenido analítico es completamente del autor.
