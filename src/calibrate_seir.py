@@ -1,21 +1,25 @@
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-# MLflow opcional: si no está instalado, no rompe el código
+# MLflow opcional: si no está instalado, el script sigue funcionando
 try:
     import mlflow
+
     MLFLOW_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
+    mlflow = None  # type: ignore
     MLFLOW_AVAILABLE = False
 
 
 # -------------------------
 # Modelo SEIR
 # -------------------------
+
 
 def simulate_seir(beta, sigma, gamma, N, I0, E0, R0, n_steps):
     """
@@ -74,6 +78,7 @@ def rmse(params, casos_reales, N, I0, E0, R0):
 # Script principal
 # -------------------------
 
+
 def main():
     base_dir = Path(__file__).resolve().parents[1]
 
@@ -86,7 +91,9 @@ def main():
 
     # Filtrar municipio de interés
     municipio_objetivo = "VALLEDUPAR"
-    df_mun = df[df["Municipio_residencia"].astype(str).str.upper() == municipio_objetivo].copy()
+    df_mun = df[
+        df["Municipio_residencia"].astype(str).str.upper() == municipio_objetivo
+    ].copy()
 
     if df_mun.empty:
         raise ValueError(f"No se encontraron registros para {municipio_objetivo} en {data_path}")
@@ -97,9 +104,9 @@ def main():
         fechas = pd.to_datetime(df_mun["Fecha"])
     else:
         df_mun = df_mun.sort_values(["ANO", "SEMANA"])
-        fechas = pd.to_datetime(
-            df_mun["ANO"].astype(str) + "-01-01"
-        ) + pd.to_timedelta((df_mun["SEMANA"] - 1) * 7, unit="D")
+        fechas = pd.to_datetime(df_mun["ANO"].astype(str) + "-01-01") + pd.to_timedelta(
+            (df_mun["SEMANA"] - 1) * 7, unit="D"
+        )
 
     casos = df_mun["casos"].astype(float).values
     n_steps = len(casos)
@@ -167,15 +174,36 @@ def main():
     if MLFLOW_AVAILABLE:
         mlflow.set_experiment("chagas_seir_valledupar")
         with mlflow.start_run(run_name="calibracion_seir_valledupar"):
+            # Parámetros
             mlflow.log_param("municipio", municipio_objetivo.title())
             mlflow.log_param("N", int(N))
             mlflow.log_param("beta", float(beta_opt))
             mlflow.log_param("sigma", float(sigma_opt))
             mlflow.log_param("gamma", float(gamma_opt))
+
+            # Métricas
             mlflow.log_metric("rmse", float(rmse_final))
 
-            mlflow.log_artifact(str(params_path))
-            mlflow.log_artifact(str(sim_path))
+            # Artefactos principales
+            mlflow.log_artifact(str(params_path), artifact_path="models")
+            mlflow.log_artifact(str(sim_path), artifact_path="reports")
+
+            # Figura simple de ajuste observados vs simulados
+            try:
+                fig, ax = plt.subplots(figsize=(6, 4))
+                ax.plot(df_sim["Fecha"], df_sim["casos_reales"], label="Casos reales")
+                ax.plot(df_sim["Fecha"], df_sim["I_sim"], label="Infecciosos simulados")
+                ax.set_xlabel("Fecha")
+                ax.set_ylabel("Casos")
+                ax.legend()
+                ax.grid(True, alpha=0.3)
+
+                mlflow.log_figure(fig, "figures/ajuste_seir_valledupar.png")
+                plt.close(fig)
+            except Exception as e:  # pragma: no cover
+                print(f"No fue posible registrar la figura en MLflow: {e}")
+    else:
+        print("MLflow no está instalado; se omite el registro de experimentos.")
 
 
 if __name__ == "__main__":
