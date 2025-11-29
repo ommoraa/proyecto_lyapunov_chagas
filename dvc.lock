@@ -35,32 +35,56 @@ stages:
   calibrate_seir:
     cmd: python src/calibrate_seir.py
     deps:
+    - path: data/clean/chagas_clean.csv
+      hash: md5
+      md5: 5077954dcc0718308aaf960e62f032b2
+      size: 84959
     - path: data/clean/chagas_prepared.csv
       hash: md5
       md5: 46f4646c8bfae64c0d360ed2a734adf5
       size: 18090
     - path: src/calibrate_seir.py
       hash: md5
-      md5: e57bda8818bfae69728856b59ee687ed
-      size: 634
+      md5: 3490777e86d73625557201e3fbb9493a
+      size: 1710
     outs:
     - path: models/seir_params.json
       hash: md5
-      md5: 4a408a0f4a48e29ead44efa501609584
-      size: 190
+      md5: 418dd50d00dd51a99940d8249c06ff71
+      size: 223
   simulate_seir:
     cmd: python src/simulate_seir.py
     deps:
     - path: models/seir_params.json
       hash: md5
-      md5: 4a408a0f4a48e29ead44efa501609584
-      size: 190
+      md5: 418dd50d00dd51a99940d8249c06ff71
+      size: 223
     - path: src/simulate_seir.py
       hash: md5
-      md5: c346aa5866d5edcc58dee729a468bec4
-      size: 1543
+      md5: e7688e8f479e8ebc039621a4855bc5b8
+      size: 1667
     outs:
     - path: reports/seir_simulation.csv
       hash: md5
-      md5: 6500020741e3af68372f72d635bb8675
-      size: 36972
+      md5: a08d027a311f5d83851b47362355fa20
+      size: 36942
+  compute_lyapunov:
+    cmd: python src/compute_lyapunov.py
+    deps:
+    - path: data/clean/chagas_prepared.csv
+      hash: md5
+      md5: 46f4646c8bfae64c0d360ed2a734adf5
+      size: 18090
+    - path: models/seir_params.json
+      hash: md5
+      md5: 418dd50d00dd51a99940d8249c06ff71
+      size: 223
+    - path: src/compute_lyapunov.py
+      hash: md5
+      md5: 9ea75835dd1fdffaa3a018feb83a2d19
+      size: 6182
+    outs:
+    - path: models/lyapunov_valledupar.json
+      hash: md5
+      md5: 08c751080cb3a541f0926a6dbd60f7f5
+      size: 197

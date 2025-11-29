@@ -31,3 +31,12 @@ stages:
       - src/simulate_seir.py
     outs:
       - reports/seir_simulation.csv
+
+  compute_lyapunov:
+    cmd: python src/compute_lyapunov.py
+    deps:
+      - data/clean/chagas_prepared.csv
+      - models/seir_params.json
+      - src/compute_lyapunov.py
+    outs:
+      - models/lyapunov_valledupar.json
