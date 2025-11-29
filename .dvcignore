@@ -1,3 +1,8 @@
-# Add patterns of files dvc should ignore, which could improve
-# the performance. Learn more at
-# https://dvc.org/doc/user-guide/dvcignore
+# Ignorar directorio de experimentos de MLflow
+mlruns/
+
+# Archivos y directorios de control de versiones / entorno
+.git/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
