@@ -15,25 +15,34 @@ Chagas - 2024
 proyecto_lyapunov_chagas/
 │
 ├── data/
-│   ├── raw/                # Datos originales (controlados por .gitignore)
-│   └── clean/              # Datos limpios + agregados
+│   ├── raw/                     # Datos originales sin procesar
+│   │   └── Datos_2024_205.xlsx
+│   │
+│   ├── clean/                   # Datos limpiados por el pipeline
+│   │   ├── chagas_clean.csv
+│   │   └─- chagas_prepared.csv
+│   │
+│   └── interim/                 # (Opcional) Datos intermedios si se requieren
+│
+├── models/
+│   ├── seir_params.json         # Parámetros ajustados del modelo SEIR
+│   └── lyapunov_valledupar.json # Resultado del cálculo del exponente de Lyapunov
 │
 ├── notebooks/
-│   ├── 01_eda_chagas.ipynb                 # Exploración de datos (EDA)
-│   ├── 02_feature_engineering_chagas.ipynb # Preparación de datos
-│   └── 03_modelo_seir_valledupar.ipynb     # Modelo SEIR + optimización
-│
-├── src/
-│   ├── clean_data.py
-│   ├── prepare_data.py
-│   ├── simulate_seir.py
-│   └── calibrate_seir.py
+│   ├── 01_eda_chagas.ipynb                  # Exploración inicial y limpieza
+│   ├── 02_feature_engineering_chagas.ipynb  # Preparación y derivación de variables
+│   └── 03_modelo_seir_valledupar.ipynb      # Ajuste de modelo y validación
 │
 ├── reports/
-│   └── figures/            # Gráficas finales para informes
+│   └── seir_simulation.csv       # Serie simulada exportada para análisis
 │
-├── dvc.yaml                # Pipeline de DVC
+├── src/
+│   ├── __init__.py
+│   ├── clean_data.py             # Limpieza inicial
+│   ├── prepare_data.py           # Feature engineering
+│   ├── calibrate_seir.py         # Ajuste base del modelo SEIR
+│   ├── simulate_seir.py          # Simulación SEIR completa
+│   └── compute_lyapunov.py       # Cálculo del exponente de Lyapunov
+│
+├── dvc.yaml                       # Pipeline completo de DVC
 ├── dvc.lock
-├── requirements.txt
-├── README.md
-└── .gitignore
