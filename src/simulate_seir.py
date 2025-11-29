@@ -1,6 +1,6 @@
 from pathlib import Path
-
 import json
+
 import numpy as np
 import pandas as pd
 from scipy.integrate import solve_ivp
@@ -19,14 +19,18 @@ def seir_system(t, y, p):
     mu = p["mu"]
     c = p["c"]
     d = p["d"]
+    m_out = p.get("m_out", 0.0)
 
     N = S + E + I + R
+    if N <= 0:
+        return [0.0, 0.0, 0.0, 0.0, 0.0]
+
     infection = beta * S * V / (1.0 + alpha * I)
 
-    dSdt = p["Lambda"] - infection - mu * S
-    dEdt = infection - (sigma + mu) * E
-    dIdt = sigma * E - (gamma + mu) * I
-    dRdt = gamma * I - mu * R
+    dSdt = p["Lambda"] - infection - (mu + m_out) * S
+    dEdt = infection - (sigma + mu + m_out) * E
+    dIdt = sigma * E - (gamma + mu + m_out) * I
+    dRdt = gamma * I - (mu + m_out) * R
     dVdt = c * I - d * V
 
     return [dSdt, dEdt, dIdt, dRdt, dVdt]
@@ -36,7 +40,7 @@ def main() -> None:
     with PARAMS_PATH.open() as f:
         params = json.load(f)
 
-    N0 = params.get("N0", 1_000.0)
+    N0 = params.get("N0", 1000.0)
     I0 = 1.0
     E0 = 0.0
     R0 = 0.0

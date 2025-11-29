@@ -18,6 +18,7 @@ stages:
   calibrate_seir:
     cmd: python src/calibrate_seir.py
     deps:
+      - data/clean/chagas_clean.csv
       - data/clean/chagas_prepared.csv
       - src/calibrate_seir.py
     outs:
