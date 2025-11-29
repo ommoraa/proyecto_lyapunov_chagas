@@ -1,73 +1,181 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
+
+# MLflow opcional: si no está instalado, no rompe el código
+try:
+    import mlflow
+    MLFLOW_AVAILABLE = True
+except ImportError:
+    MLFLOW_AVAILABLE = False
 
 
-# Municipio foco
-DEP = "CESAR"
-MPIO = "VALLEDUPAR"
+# -------------------------
+# Modelo SEIR
+# -------------------------
 
-CLEAN_PATH = Path("data/clean/chagas_clean.csv")
-AGG_PATH = Path("data/clean/chagas_prepared.csv")
-OUT_PATH = Path("models/seir_params.json")
+def simulate_seir(beta, sigma, gamma, N, I0, E0, R0, n_steps):
+    """
+    Simula un modelo SEIR sencillo usando un esquema de Euler hacia adelante
+    con paso de tiempo dt = 1 (por ejemplo, 1 semana).
+    """
+    S0 = N - I0 - E0 - R0
+
+    S = np.zeros(n_steps)
+    E = np.zeros(n_steps)
+    I = np.zeros(n_steps)
+    R = np.zeros(n_steps)
+
+    S[0] = S0
+    E[0] = E0
+    I[0] = I0
+    R[0] = R0
+
+    dt = 1.0
+
+    for t in range(1, n_steps):
+        dS = -beta * S[t - 1] * I[t - 1] / N
+        dE = beta * S[t - 1] * I[t - 1] / N - sigma * E[t - 1]
+        dI = sigma * E[t - 1] - gamma * I[t - 1]
+        dR = gamma * I[t - 1]
+
+        S[t] = S[t - 1] + dt * dS
+        E[t] = E[t - 1] + dt * dE
+        I[t] = I[t - 1] + dt * dI
+        R[t] = R[t - 1] + dt * dR
+
+    return S, E, I, R
 
 
-def estimate_migration_rate(df_clean: pd.DataFrame) -> float:
-    """Tasa simple de migración de salida para el municipio foco."""
-    df_res = df_clean[
-        (df_clean["Departamento_residencia"] == DEP)
-        & (df_clean["Municipio_residencia"] == MPIO)
-    ].copy()
+def rmse(params, casos_reales, N, I0, E0, R0):
+    """
+    Función objetivo: RMSE entre la serie simulada de infecciosos (I)
+    y la serie de casos observados.
+    """
+    beta, sigma, gamma = params
 
-    if df_res.empty:
-        return 0.0
+    # Evitar parámetros no físicos
+    if beta <= 0 or sigma <= 0 or gamma <= 0:
+        return 1e9
 
-    migrados = df_res[
-        df_res["Municipio_ocurrencia"] != df_res["Municipio_residencia"]
-    ]
+    n_steps = len(casos_reales)
+    _, _, I_sim, _ = simulate_seir(beta, sigma, gamma, N, I0, E0, R0, n_steps)
 
-    tasa = len(migrados) / len(df_res)
+    # Para evitar valores negativos por discretización
+    I_sim = np.clip(I_sim, a_min=0, a_max=None)
 
-    return float(tasa)
+    return np.sqrt(np.mean((I_sim - casos_reales) ** 2))
 
 
-def main() -> None:
-    df_clean = pd.read_csv(CLEAN_PATH)
-    df_agg = pd.read_csv(AGG_PATH)
+# -------------------------
+# Script principal
+# -------------------------
 
-    foco = df_agg[
-        (df_agg["Departamento_residencia"] == DEP)
-        & (df_agg["Municipio_residencia"] == MPIO)
-    ].copy()
+def main():
+    base_dir = Path(__file__).resolve().parents[1]
 
-    foco = foco.sort_values(["ANO", "SEMANA"])
+    data_path = base_dir / "data" / "clean" / "chagas_prepared.csv"
+    params_path = base_dir / "models" / "seir_params.json"
+    sim_path = base_dir / "reports" / "seir_simulation.csv"
 
-    if foco.empty:
-        raise ValueError("No hay datos agregados para el municipio foco.")
+    # 1. Cargar datos preparados
+    df = pd.read_csv(data_path)
 
-    max_casos = foco["casos"].max()
-    total_casos = foco["casos"].sum()
+    # Filtrar municipio de interés
+    municipio_objetivo = "VALLEDUPAR"
+    df_mun = df[df["Municipio_residencia"].astype(str).str.upper() == municipio_objetivo].copy()
 
-    N0 = float(max(max_casos * 100.0, total_casos * 10.0))
+    if df_mun.empty:
+        raise ValueError(f"No se encontraron registros para {municipio_objetivo} en {data_path}")
 
-    m_out = estimate_migration_rate(df_clean)
+    # Asegurar que haya columna Fecha; si no, usamos un índice simple
+    if "Fecha" in df_mun.columns:
+        df_mun = df_mun.sort_values("Fecha")
+        fechas = pd.to_datetime(df_mun["Fecha"])
+    else:
+        df_mun = df_mun.sort_values(["ANO", "SEMANA"])
+        fechas = pd.to_datetime(
+            df_mun["ANO"].astype(str) + "-01-01"
+        ) + pd.to_timedelta((df_mun["SEMANA"] - 1) * 7, unit="D")
 
+    casos = df_mun["casos"].astype(float).values
+    n_steps = len(casos)
+
+    # 2. Definir condiciones iniciales y parámetros de población
+    N = 100_000  # población efectiva aproximada
+    I0 = max(1.0, casos[0])
+    E0 = I0
+    R0 = 0.0
+
+    # 3. Optimización de parámetros (beta, sigma, gamma)
+    x0 = np.array([0.5, 0.2, 0.1])  # valores iniciales razonables
+    bounds = [(1e-6, 2.0), (1e-6, 2.0), (1e-6, 2.0)]
+
+    result = minimize(
+        rmse,
+        x0,
+        args=(casos, N, I0, E0, R0),
+        method="L-BFGS-B",
+        bounds=bounds,
+    )
+
+    beta_opt, sigma_opt, gamma_opt = result.x
+    rmse_final = rmse(result.x, casos, N, I0, E0, R0)
+
+    # 4. Simulación final con parámetros óptimos
+    S_sim, E_sim, I_sim, R_sim = simulate_seir(
+        beta_opt, sigma_opt, gamma_opt, N, I0, E0, R0, n_steps
+    )
+    I_sim = np.clip(I_sim, a_min=0, a_max=None)
+
+    # 5. Guardar parámetros en JSON
     params = {
-        "beta": 0.2,
-        "alpha": 0.01,
-        "sigma": 1.0 / 60.0,
-        "gamma": 1.0 / 180.0,
-        "mu": 1.0 / (70.0 * 365.0),
-        "c": 0.05,
-        "d": 1.0 / 365.0,
-        "N0": N0,
-        "m_out": m_out,
+        "municipio": municipio_objetivo.title(),
+        "beta": float(beta_opt),
+        "sigma": float(sigma_opt),
+        "gamma": float(gamma_opt),
+        "N": int(N),
+        "rmse": float(rmse_final),
     }
 
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with OUT_PATH.open("w") as f:
-        json.dump(params, f, indent=2)
+    params_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(params_path, "w", encoding="utf-8") as f:
+        json.dump(params, f, indent=4, ensure_ascii=False)
+
+    # 6. Guardar simulación en CSV
+    sim_path.parent.mkdir(parents=True, exist_ok=True)
+    df_sim = pd.DataFrame(
+        {
+            "Fecha": fechas,
+            "casos_reales": casos,
+            "S": S_sim,
+            "E": E_sim,
+            "I_sim": I_sim,
+            "R": R_sim,
+        }
+    )
+    df_sim.to_csv(sim_path, index=False)
+
+    print(f"Parámetros óptimos guardados en: {params_path}")
+    print(f"Simulación SEIR guardada en: {sim_path}")
+    print(f"RMSE final: {rmse_final:.4f}")
+
+    # 7. Registro en MLflow (si está disponible)
+    if MLFLOW_AVAILABLE:
+        mlflow.set_experiment("chagas_seir_valledupar")
+        with mlflow.start_run(run_name="calibracion_seir_valledupar"):
+            mlflow.log_param("municipio", municipio_objetivo.title())
+            mlflow.log_param("N", int(N))
+            mlflow.log_param("beta", float(beta_opt))
+            mlflow.log_param("sigma", float(sigma_opt))
+            mlflow.log_param("gamma", float(gamma_opt))
+            mlflow.log_metric("rmse", float(rmse_final))
+
+            mlflow.log_artifact(str(params_path))
+            mlflow.log_artifact(str(sim_path))
 
 
 if __name__ == "__main__":

@@ -18,25 +18,17 @@ stages:
   calibrate_seir:
     cmd: python src/calibrate_seir.py
     deps:
-      - data/clean/chagas_clean.csv
       - data/clean/chagas_prepared.csv
       - src/calibrate_seir.py
     outs:
       - models/seir_params.json
-
-  simulate_seir:
-    cmd: python src/simulate_seir.py
-    deps:
-      - models/seir_params.json
-      - src/simulate_seir.py
-    outs:
       - reports/seir_simulation.csv
 
-compute_lyapunov:
+  compute_lyapunov:
     cmd: python src/compute_lyapunov.py
     deps:
       - data/clean/chagas_prepared.csv
       - models/seir_params.json
       - src/compute_lyapunov.py
-    metrics_no_cache:
+    outs:
       - models/lyapunov_valledupar.json

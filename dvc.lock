@@ -25,33 +25,33 @@ stages:
       size: 84959
     - path: src/prepare_data.py
       hash: md5
-      md5: 16bbc9c8a2845d8c77303c5ebefd38cb
-      size: 589
+      md5: b374470593050907b7a670e719975bba
+      size: 2400
     outs:
     - path: data/clean/chagas_prepared.csv
       hash: md5
-      md5: 46f4646c8bfae64c0d360ed2a734adf5
-      size: 18090
+      md5: 14b2c122f522f6a03307576cc28d967b
+      size: 25015
   calibrate_seir:
     cmd: python src/calibrate_seir.py
     deps:
-    - path: data/clean/chagas_clean.csv
-      hash: md5
-      md5: 5077954dcc0718308aaf960e62f032b2
-      size: 84959
     - path: data/clean/chagas_prepared.csv
       hash: md5
-      md5: 46f4646c8bfae64c0d360ed2a734adf5
-      size: 18090
+      md5: 14b2c122f522f6a03307576cc28d967b
+      size: 25015
     - path: src/calibrate_seir.py
       hash: md5
-      md5: 3490777e86d73625557201e3fbb9493a
-      size: 1710
+      md5: 5a2aceb52a120b94d650afc652a6607c
+      size: 5340
     outs:
     - path: models/seir_params.json
       hash: md5
-      md5: 418dd50d00dd51a99940d8249c06ff71
-      size: 223
+      md5: 2d3e6a3eddde52bfd87511c275557c6c
+      size: 138
+    - path: reports/seir_simulation.csv
+      hash: md5
+      md5: 1d6c33a5b562c3c6a197b0c726ef3a9a
+      size: 1954
   simulate_seir:
     cmd: python src/simulate_seir.py
     deps:
@@ -73,12 +73,12 @@ stages:
     deps:
     - path: data/clean/chagas_prepared.csv
       hash: md5
-      md5: 46f4646c8bfae64c0d360ed2a734adf5
-      size: 18090
+      md5: 14b2c122f522f6a03307576cc28d967b
+      size: 25015
     - path: models/seir_params.json
       hash: md5
-      md5: 418dd50d00dd51a99940d8249c06ff71
-      size: 223
+      md5: 2d3e6a3eddde52bfd87511c275557c6c
+      size: 138
     - path: src/compute_lyapunov.py
       hash: md5
       md5: 9ea75835dd1fdffaa3a018feb83a2d19
@@ -86,5 +86,5 @@ stages:
     outs:
     - path: models/lyapunov_valledupar.json
       hash: md5
-      md5: 08c751080cb3a541f0926a6dbd60f7f5
-      size: 197
+      md5: 9a6e6d6d34a86aa4307e93921afbd054
+      size: 169

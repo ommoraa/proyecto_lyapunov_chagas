@@ -17,3 +17,6 @@ mlruns/
 # Archivos de configuración sensibles
 .env
 *.log
+
+# Directorios de MLflow
+mlruns/
