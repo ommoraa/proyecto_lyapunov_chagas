@@ -1,11 +1,5 @@
+streamlit
 pandas
 numpy
-scipy
 matplotlib
-seaborn
 scikit-learn
-dvc
-dvc-s3
-mlflow
-streamlit
-mlflowstreamlit
