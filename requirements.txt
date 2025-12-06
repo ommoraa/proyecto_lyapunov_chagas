@@ -8,4 +8,4 @@ dvc
 dvc-s3
 mlflow
 streamlit
-mlflow
+mlflowstreamlit
