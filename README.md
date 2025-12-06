@@ -1,178 +1,232 @@
-## Modelo SEIR aplicado a casos de Chagas en Colombia 
-Este proyecto desarrolla un flujo de trabajo reproducible para el análisis epidemiológico de los casos de Chagas reportados en Colombia durante 2024. El proceso incluye limpieza, preparación y modelamiento de los datos mediante un modelo SEIR, complementado con el cálculo del exponente de Lyapunov para evaluar la estabilidad dinámica del sistema.
+README — Proyecto SEIR–Lyapunov Stability Analyzer (Chagas)
+## 1. Título del Proyecto
 
-El municipio seleccionado para el estudio es Valledupar, elegido tras una exploración inicial por su volumen representativo de casos y la consistencia de su serie temporal.
+Análisis de Estabilidad y Dinámica del Modelo SEIR Aplicado a Chagas en Colombia mediante Exponentes de Lyapunov
 
-Los datos utilizados provienen del sistema oficial Sivigila:
-https://portalsivigila.ins.gov.co/Paginas/Buscador.aspx#
+## 2. Descripción General
 
-(Chagas – 2024)
+Este proyecto desarrolla un sistema integrado para:
 
-## 1. Objetivo del proyecto
-El propósito es ajustar un modelo SEIR que permita aproximar el comportamiento temporal de los casos observados en Valledupar y evaluar si el sistema presenta sensibilidad a condiciones iniciales mediante el cálculo del exponente de Lyapunov.
+- Simular y analizar la dinámica epidemiológica del modelo SEIR ajustado a los casos de Chagas en Colombia, con enfoque particular en la ciudad de Valledupar.
 
-- Este trabajo se estructura siguiendo buenas prácticas de ciencia de datos y MLOps:
+- Calibrar parámetros epidemiológicos, permitiendo explorar distintos escenarios de transmisión.
 
-- Versionamiento de datos con DVC
+- Calcular exponentes de Lyapunov, con el propósito de evaluar la estabilidad dinámica del sistema y caracterizar la sensibilidad a las condiciones iniciales.
 
-- Registro de experimentos con MLflow
+- Visualizar interactivamente los resultados mediante una aplicación en Streamlit, facilitando el análisis por investigadores, epidemiólogos y tomadores de decisiones.
 
-- Modelamiento reproducible en Python
+- El proyecto incorpora buenas prácticas de ingeniería de software y reproducibilidad científica, integrando Git, control de versiones de datos, organización modular de scripts y una aplicación web funcional.
 
-- Visualización y despliegue ligero con Streamlit
+## 3. Estructura del Repositorio
 
-- Documentación del flujo completo
-
-## 2. Estructura del proyecto
 proyecto_lyapunov_chagas/
-│
 ├── data/
-│   ├── raw/                     # Datos originales sin procesar
-│   │   └── Datos_2024_205.xlsx
-│   │
-│   ├── clean/                   # Salidas del pipeline de limpieza y preparación
-│   │   ├── chagas_clean.csv
-│   │   └── chagas_prepared.csv
-│   │
-│   └── interim/                 # Archivos intermedios
+│   ├── seir_simulation.csv               # Simulaciones generadas a partir del modelo SEIR
+│   ├── seir_valledupar.csv               # Datos de calibración para Valledupar
+│   └── cm_seir_valledupar.png            # Mapas y gráficos utilizados en informes
 │
 ├── models/
-│   ├── seir_params.json         # Parámetros ajustados del modelo SEIR
-│   └── lyapunov_valledupar.json # Resultado del exponente de Lyapunov
+│   ├── seir_params.json                  # Parámetros del modelo SEIR
+│   ├── seir_params_opt.json              # Parámetros optimizados globales
+│   ├── seir_params_opt_valledupar.json   # Parámetros optimizados para Valledupar
+│   └── lyapunov_valledupar.json          # Exponente de Lyapunov asociado a la simulación
 │
 ├── notebooks/
-│   ├── 01_eda_chagas.ipynb                  # Exploración y comprensión de los datos
-│   ├── 02_feature_engineering_chagas.ipynb  # Transformaciones y preparación
-│   └── 03_modelo_seir_valledupar.ipynb      # Ajuste y análisis del modelo SEIR
-│
-├── reports/
-│   └── seir_simulation.csv       # Serie simulada para evaluación del modelo
+│   └── análisis_*                         # Jupyter notebooks para exploración y validación
 │
 ├── src/
-│   ├── __init__.py
-│   ├── clean_data.py             # Procesamiento y depuración inicial
-│   ├── prepare_data.py           # Feature engineering
-│   ├── calibrate_seir.py         # Ajuste del modelo SEIR + MLflow tracking
-│   ├── simulate_seir.py          # Funciones del modelo SEIR
-│   └── compute_lyapunov.py       # Cálculo del exponente de Lyapunov
+│   ├── clean_data.py                      # Limpieza y preparación de datos
+│   ├── prepare_data.py                    # Ensambles, transformaciones y particiones
+│   ├── simulate_seir.py                   # Implementación del modelo SEIR
+│   ├── compute_lyapunov.py                # Cálculo del exponente de Lyapunov
+│   └── calibrate_seir.py                  # Ajuste y estimación de parámetros
 │
 ├── app/
-│   └── streamlit_app.py          # Visualización interactiva
+│   └── streamlit_app.py                   # Aplicación Streamlit para visualización dinámica
 │
-├── dvc.yaml                       # Pipeline del proyecto
-├── dvc.lock
-└── requirements.txt
+├── reports/
+│   └── figuras, mapas y simulaciones
+│
+├── dvc.yaml                               # (Opcional) Esquema para control de datos
+├── requirements.txt                       # Dependencias del proyecto
+└── README.md
 
-## 3. Instalación del entorno
+## 4. Pipeline del Proyecto
 
-## 3.1. Crear y activar entorno
-python3 -m venv .venv
-source .venv/bin/activate   # macOS / Linux
-# .venv\Scripts\activate    # Windows
+Aunque este proyecto no implementa un pipeline DVC completo como el anterior, su flujo metodológico puede describirse de la siguiente forma:
 
-## 3.2 Instalar dependencias
+### 1. Limpieza y preparación de datos (src/clean_data.py)
 
-pip install -r requirements.txt
+- Unificación, verificación y depuración de registros.
 
-## 4. Obtención de los datos
-El proyecto utiliza DVC para gestionar los datos versionados. Si es la primera vez que se clona el repositorio:
+- Ajuste de estructuras temporales.
 
-dvc pull
+- Normalización y validación de variables epidemiológicas.
 
-Esto descargará los archivos necesarios en data/raw y data/clean.
+### 2. Calibración del modelo SEIR (src/calibrate_seir.py)
 
-## 5. Ejecución del pipeline completo
+- Optimización de parámetros para reproducir tendencias reales.
 
-El flujo de procesamiento está definido en dvc.yaml con las siguientes etapas:
+- Uso de mínimos cuadrados y ajuste por sensibilidad.
 
-- clean_data: limpieza inicial
+### 3. Simulación del modelo SEIR (src/simulate_seir.py)
 
-- prepare_data: agregaciones y transformación
+- Resolución numérica del sistema diferencial.
 
-- calibrate_seir: ajuste del modelo SEIR + MLflow
+- Obtención de curvas S, E, I, R, V.
 
-- compute_lyapunov: estimación del exponente de Lyapunov
+- Identificación de picos, crecimiento inicial y colas epidémicas.
 
-Para ejecutar todo el pipeline: dvc repro
+### 4. Cálculo del exponente de Lyapunov (src/compute_lyapunov.py)
 
-## 6. Modelo SEIR
+- Perturbación de condiciones iniciales.
 
-El modelo SEIR se ajusta mediante optimización numérica (L-BFGS-B) para estimar:
+- Integración sobre la trayectoria del sistema.
 
-- β (tasa de transmisión)
+- Estimación de la tasa de divergencia:
 
-- σ (tasa de progresión expuesto → infeccioso)
+\[
+\lambda = \lim_{t \to \infty} \frac{1}{t} \ln\left( \frac{|\delta(t)|}{|\delta(0)|} \right)
+\]
 
-- γ (tasa de recuperación)
+- Interpretación:
 
-La calibración se realiza comparando la serie simulada de infecciosos con los casos reportados en Valledupar durante 2024.
+    λ < 0 : sistema estable
 
-La salida principal es: 
-models/seir_params.json
-reports/seir_simulation.csv
+    λ > 0 : sensibilidad y posible comportamiento caótico
 
-Además, el script registra: parámetros, métricas, simulación y figura del ajuste en MLflow.
+### 5. Visualización interactiva (app/streamlit_app.py)
 
-## 7. Registro de experimentos con MLflow
+- Panel para explorar las curvas del modelo.
 
-Para iniciar la interfaz de MLflow:
+- Inspección de parámetros calibrados.
 
-- mlflow ui --backend-store-uri mlruns/
-- Interfaz disponible en: http://127.0.0.1:5000
+- Visualización del exponente de Lyapunov.
 
-Cada ejecución de calibrate_seir.py queda almacenada como un nuevo experimento con: parámetros ajustados, RMSE, artefactos del modelo y visualizaciones.
+- Generación de gráficos dinámicos.
 
-## 8. Visualización interactiva (Streamlit)
+## 5. Modelos Implementados
+Modelo principal: SEIR clásico con parametrización epidemiológica. El proyecto utiliza un modelo SEIR extendido, expresado como:
 
-El proyecto incluye una aplicación sencilla para visualizar: 
+\[
+\begin{aligned}
+\frac{dS}{dt} &= -\beta S I \\
+\frac{dE}{dt} &= \beta S I - \sigma E \\
+\frac{dI}{dt} &= \sigma E - \gamma I \\
+\frac{dR}{dt} &= \gamma I
+\end{aligned}
+\]
 
-- Casos reales
+Con componentes adicionales según la calibración del vector.
 
-- Serie simulada SEIR
+***Estabilidad dinámica mediante exponentes de Lyapunov***
 
-- Parámetros ajustados
+Se genera un análisis y caracterización de estabilidad del sistema mediante:
 
-- Descripción del modelo
+- Perturbaciones pequeñas.
 
-Para iniciarla: streamlit run app/streamlit_app.py
+- Comparación de trayectorias.
 
-## 9. Cálculo del exponente de Lyapunov
+- Tasa de divergencia acumulada.
 
-El archivo compute_lyapunov.py implementa una rutina para:
+## 6. Reproducibilidad
+- Instalación del entorno: pip install -r requirements.txt
 
-- linealizar el sistema alrededor de la trayectoria simulada
+- Simulación del modelo SEIR: python src/simulate_seir.py
 
-- estimar la tasa de divergencia de trayectorias
+- Cálculo del exponente de Lyapunov: python src/compute_lyapunov.py
 
-- obtener un indicador de estabilidad del sistema
+- Calibración del modelo: python src/calibrate_seir.py
 
-El resultado se guarda en: models/lyapunov_valledupar.json
+## 7. Aplicación Streamlit
 
-## 10. Reproducibilidad
+Este proyecto incluye una aplicación interactiva que permite:
 
-Este proyecto garantiza reproducibilidad mediante:
+- Visualizar curvas S–E–I–R–V
 
-- Versionamiento de datos y dependencias con DVC
+- Observar picos epidémicos
 
-- Registro automático de experimentos con MLflow
+- Cargar parámetros calibrados
 
-- Pipeline definido en dvc.yaml
+- Visualizar el exponente de Lyapunov
 
-- Entorno controlado mediante requirements.txt
+- Explorar escenarios epidemiológicos
 
-- Código modular en src/
+- Ejecutar localmente: streamlit run app/streamlit_app.py
 
-- Cualquier usuario puede replicar el flujo completo ejecutando:
 
-dvc pull
-dvc repro
+## 8. Consideraciones Metodológicas
 
-## 11. Referencias
+Las decisiones matemáticas y computacionales se basan en:
 
-- Instituto Nacional de Salud – Sivigila
-https://portalsivigila.ins.gov.co
+- La naturaleza del sistema dinámico SEIR.
 
-- Anderson, R. M., & May, R. M. (1991). Infectious diseases of humans: Dynamics and control. Oxford University Press.
+- La relevancia del análisis de estabilidad para modelos epidemiológicos.
 
-## Nota sobre la elaboración del proyecto
-Este proyecto fue elaborado por el autor y contó con asistencia de ChatGPT en la corrección, depuración, estandarización y adaptación del código Python, así como en la organización de notebooks, scripts, documentación técnica y estructuración del pipeline. La responsabilidad final sobre el diseño, decisiones metodológicas y contenido analítico es completamente del autor.
+- La pertinencia de calibrar parámetros específicos para Chagas en Valledupar.
+
+- El uso del exponente de Lyapunov como medida de robustez dinámica.
+
+- La necesidad de reproducibilidad científica mediante scripts modulares.
+
+## 9. Ejecución del Proyecto desde Cero
+
+        git clone https://github.com/ommoraa/proyecto_lyapunov_chagas.git
+        cd proyecto_lyapunov_chagas
+        pip install -r requirements.txt
+
+        # Simulación y análisis
+        python src/simulate_seir.py
+        python src/compute_lyapunov.py
+
+## 10. Limitaciones
+
+- La calibración depende de la disponibilidad y calidad de datos reales.
+
+- El modelo SEIR clásico no incorpora:
+
+        heterogeneidad espacial,
+
+        inmunidad parcial,
+
+        mortalidad específica.
+
+- El cálculo del exponente de Lyapunov puede ser sensible a: resolución temporal integración numérica, tamaño de perturbación inicial.
+
+## 11. Líneas Futuras de Trabajo
+
+- Incorporación de modelos vectoriales más complejos.
+
+- Inclusión de mortalidad y natalidad.
+
+- Modelos SEIHRD o SEIRV extendidos.
+
+- Evaluaciones basadas en estabilidad no lineal avanzada.
+
+- Integración con plataformas CI/CD para despliegue automático.
+
+## 12. Licencia: Proyecto con fines académicos y de investigación científica.
+
+## 13. Aplicación Web (Streamlit)
+
+La aplicación web permite explorar los resultados del modelo de manera interactiva:
+
+- curvas epidemiológicas,
+
+- parámetros ajustados,
+
+- valores del exponente de Lyapunov.
+
+Su propósito es facilitar la interpretación y transferencia de resultados hacia comunidades científicas y entidades de salud pública. Acceso en línea: https://proyectolyapunovchagas-vwkyu7flkzouugz9cgg8jr.streamlit.app/
+
+### Nota sobre la elaboración del proyecto
+Este proyecto fue elaborado por los autores y contó con asistencia de ChatGPT en la corrección, depuración, estandarización y adaptación del código Python, así como en la organización de notebooks, scripts, documentación técnica y estructuración del pipeline. La responsabilidad final sobre el diseño, decisiones metodológicas y contenido analítico es completamente de los autores.
+
+## Autores  
+
+- Arsenio Hidalgo Troya  
+
+- Oscar Mauricio Mora Arroyo  
+  Asignatura: Ciencia de Datos para la Investigación Científica  
+  Programa: Doctorado en Ciencias Naturales y Matemáticas  
+  Universidad de Nariño (UDENAR) – 2025
