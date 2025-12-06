@@ -1,4 +1,15 @@
-/seir_simulation.csv
-/seir_valledupar.csv
-/seir_valledupar.png
-/lyapunov_distances_valledupar.csv
+# Ignorar todo por defecto
+*
+
+# Pero NO ignorar el propio .gitignore
+!.gitignore
+
+# Permitir CSV importantes
+!seir_simulation.csv
+!seir_valledupar.csv
+!lyapunov_distances_valledupar.csv
+
+# Permitir PNG generados
+!cm_seir_valledupar.png
+!roc_seir_valledupar.png
+!residuos_seir_valledupar.png
