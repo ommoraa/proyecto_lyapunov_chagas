@@ -18,7 +18,7 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parents[1]
 
 # -----------------------------
 # Carga de datos con cache
