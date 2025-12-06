@@ -1,34 +1,46 @@
 stages:
+
   clean_data:
     cmd: python src/clean_data.py
     deps:
-      - data/raw/Datos_2024_205.xlsx
       - src/clean_data.py
+      - data/raw/Datos_2024_205.xlsx
     outs:
       - data/clean/chagas_clean.csv
 
   prepare_data:
     cmd: python src/prepare_data.py
     deps:
-      - data/clean/chagas_clean.csv
       - src/prepare_data.py
+      - data/clean/chagas_clean.csv
     outs:
       - data/clean/chagas_prepared.csv
+      - data/clean/chagas_ts_foco.csv
 
-  calibrate_seir:
+  simulate_seir:
+    cmd: python src/simulate_seir.py
+    deps:
+      - src/simulate_seir.py
+      - models/seir_params.json      # parámetros base
+    outs:
+      - reports/seir_simulation.csv
+
+  c  calibrate_seir:
     cmd: python src/calibrate_seir.py
     deps:
-      - data/clean/chagas_prepared.csv
       - src/calibrate_seir.py
-    outs:
+      - data/clean/chagas_ts_foco.csv
       - models/seir_params.json
-      - reports/seir_simulation.csv
+    outs:
+      - models/seir_params_opt.json
+      - reports/seir_valledupar.csv
+      - reports/seir_valledupar.png
 
   compute_lyapunov:
     cmd: python src/compute_lyapunov.py
     deps:
-      - data/clean/chagas_prepared.csv
-      - models/seir_params.json
       - src/compute_lyapunov.py
+      - models/seir_params_opt.json
     outs:
       - models/lyapunov_valledupar.json
+      - reports/lyapunov_distances_valledupar.csv

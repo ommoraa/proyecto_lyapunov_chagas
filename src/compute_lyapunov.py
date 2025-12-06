@@ -1,222 +1,228 @@
+"""
+compute_lyapunov.py
+
+Cálculo del exponente de Lyapunov máximo para el modelo SEIR continuo
+con incidencia no lineal y migración, usando los parámetros calibrados
+para Valledupar (Cesar).
+
+Este script:
+- Lee parámetros óptimos desde models/seir_params_opt.json
+- Simula dos trayectorias cercanas del sistema SEIR (S, E, I, R, V)
+- Aplica un esquema tipo Benettin para estimar el exponente de Lyapunov máximo
+- Guarda:
+    - models/lyapunov_valledupar.json
+    - reports/lyapunov_distances_valledupar.csv
+"""
+
+from pathlib import Path
 import json
 import numpy as np
 import pandas as pd
-from pathlib import Path
+from scipy.integrate import solve_ivp
 
 
-# -------------------------
-# Dinámica SEIR
-# -------------------------
+# --------------------- RUTAS ---------------------
 
-def seir_rhs(state, beta, sigma, gamma, N):
+PARAMS_OPT_PATH = Path("models/seir_params_opt.json")
+OUT_JSON = Path("models/lyapunov_valledupar.json")
+OUT_DIST_CSV = Path("reports/lyapunov_distances_valledupar.csv")
+
+
+# --------------------- PREPARACIÓN DE PARÁMETROS ---------------------
+
+def prepare_params(params: dict) -> dict:
     """
-    Ecuaciones diferenciales del modelo SEIR en forma discreta
-    (un paso de integración con tamaño dt).
+    Asegura que todos los parámetros necesarios estén presentes,
+    asignando valores por defecto en caso necesario.
     """
-    S, E, I, R = state
+    p = params.copy()
 
-    dS = -beta * S * I / N
-    dE = beta * S * I / N - sigma * E
-    dI = sigma * E - gamma * I
-    dR = gamma * I
+    p_clean = {
+        "N0": float(p.get("N0", 3500.0)),
+        "beta": float(p.get("beta", 0.2)),
+        "alpha": float(p.get("alpha", 0.01)),
+        "sigma": float(p.get("sigma", 1 / 60)),
+        "gamma": float(p.get("gamma", 1 / 180)),
+        "mu": float(p.get("mu", 0.000039)),
+        "c": float(p.get("c", 0.05)),
+        "d": float(p.get("d", 1 / 365)),
+        "m_out": float(p.get("m_out", 0.017)),
+    }
 
-    return np.array([dS, dE, dI, dR], dtype=float)
+    # Tasa de entrada / nacimiento
+    p_clean["Lambda"] = float(p.get("Lambda", p_clean["mu"] * p_clean["N0"]))
+
+    return p_clean
 
 
-def jacobian_seir(state, beta, sigma, gamma, N):
+# --------------------- SISTEMA SEIR ---------------------
+
+def seir_system(t, y, p):
     """
-    Matriz jacobiana del modelo SEIR evaluada en el estado actual.
+    Sistema SEIR con incidencia no lineal y migración.
+    y = [S, E, I, R, V]
     """
-    S, E, I, R = state
+    S, E, I, R, V = y
 
-    J = np.zeros((4, 4), dtype=float)
+    beta = p["beta"]
+    alpha = p["alpha"]
+    sigma = p["sigma"]
+    gamma = p["gamma"]
+    mu = p["mu"]
+    c = p["c"]
+    d = p["d"]
+    m_out = p["m_out"]
+    Lambda = p["Lambda"]
 
-    # d(dS)/dS, d(dS)/dI
-    J[0, 0] = -beta * I / N
-    J[0, 2] = -beta * S / N
+    N = S + E + I + R
+    if N <= 0:
+        return [0.0, 0.0, 0.0, 0.0, 0.0]
 
-    # d(dE)/dS, d(dE)/dE, d(dE)/dI
-    J[1, 0] = beta * I / N
-    J[1, 1] = -sigma
-    J[1, 2] = beta * S / N
+    infection = beta * S * V / (1.0 + alpha * I)
 
-    # d(dI)/dE, d(dI)/dI
-    J[2, 1] = sigma
-    J[2, 2] = -gamma
+    dSdt = Lambda - infection - (mu + m_out) * S
+    dEdt = infection - (sigma + mu + m_out) * E
+    dIdt = sigma * E - (gamma + mu + m_out) * I
+    dRdt = gamma * I - (mu + m_out) * R
+    dVdt = c * I - d * V
 
-    # d(dR)/dI
-    J[3, 2] = gamma
-
-    return J
+    return [dSdt, dEdt, dIdt, dRdt, dVdt]
 
 
-# -------------------------
-# Cálculo del exponente de Lyapunov máximo
-# -------------------------
+# --------------------- INTEGRACIÓN DE UNA TRAYECTORIA ---------------------
 
-def largest_lyapunov(beta, sigma, gamma, N, x0,
-                     n_steps=200, dt=1.0, renorm_every=5):
+def integrate_trajectory(y0, p, t0, t1, dt=1.0):
     """
-    Cálculo aproximado del exponente de Lyapunov máximo usando un
-    esquema tipo Benettin para sistemas continuos.
-
-    Parámetros
-    ----------
-    beta, sigma, gamma : float
-        Parámetros del modelo SEIR.
-    N : float
-        Tamaño poblacional efectivo.
-    x0 : iterable de longitud 4
-        Estado inicial [S0, E0, I0, R0].
-    n_steps : int
-        Número de pasos de integración.
-    dt : float
-        Tamaño de paso.
-    renorm_every : int
-        Cada cuántos pasos se renormaliza el vector de perturbación.
+    Integra el sistema SEIR desde t0 hasta t1 con paso aproximado dt.
+    Devuelve (t, Y) donde Y es un arreglo 2D con columnas = estados en el tiempo.
     """
-    x = np.array(x0, dtype=float)
+    t_eval = np.arange(t0, t1 + dt, dt)
 
-    # Perturbación inicial aleatoria normalizada
-    v = np.random.randn(4)
-    v /= np.linalg.norm(v)
-
-    sum_log = 0.0
-    t = 0.0
-
-    for k in range(1, n_steps + 1):
-        # Paso del sistema principal
-        dx = seir_rhs(x, beta, sigma, gamma, N)
-        x = x + dt * dx
-
-        # Paso del sistema variacional usando el jacobiano
-        J = jacobian_seir(x, beta, sigma, gamma, N)
-        v = v + dt * (J @ v)
-
-        # Renormalización periódica
-        if k % renorm_every == 0:
-            norm_v = np.linalg.norm(v)
-            if norm_v == 0:
-                # Evitar vectores nulos por redondeo numérico
-                v = np.random.randn(4)
-                v /= np.linalg.norm(v)
-            else:
-                sum_log += np.log(norm_v)
-                v /= norm_v
-
-        t += dt
-
-    # Exponente de Lyapunov máximo aproximado
-    lyap_max = sum_log / (t if t > 0 else 1.0)
-    return lyap_max
+    sol = solve_ivp(
+        lambda t, y: seir_system(t, y, p),
+        (t0, t1),
+        y0,
+        t_eval=t_eval,
+        vectorized=False,
+    )
+    return sol.t, sol.y
 
 
-# -------------------------
-# Utilidades para cargar datos y parámetros
-# -------------------------
+# --------------------- CÁLCULO DEL EXPONENTE DE LYAPUNOV ---------------------
 
-def load_series_for_municipio(path_csv, municipio):
+def lyapunov_maximum(params: dict, T_total: float = 365.0,
+                     dt_block: float = 7.0, delta0: float = 1e-5):
     """
-    Carga la serie de casos para un municipio específico desde un CSV limpio.
-    No exige columna Fecha. Si existe, la usa para ordenar; si no, sigue tal cual.
+    Calcula el exponente de Lyapunov máximo usando un esquema tipo Benettin.
+
+    params   : diccionario de parámetros (ya calibrados)
+    T_total  : tiempo total de integración (días)
+    dt_block : tamaño de cada bloque de integración (días)
+    delta0   : norma inicial de la perturbación
     """
-    df = pd.read_csv(path_csv)
+    p = prepare_params(params)
 
-    # --- Detectar columna municipio ---
-    posibles_municipio = ["Municipio_residencia", "municipio", "Municipio"]
-    col_mpio = next((c for c in posibles_municipio if c in df.columns), None)
-    if col_mpio is None:
-        raise ValueError(f"No se encontró columna de municipio. Columnas: {df.columns.tolist()}")
-
-    df_mun = df[df[col_mpio].astype(str).str.upper() == municipio.upper()].copy()
-
-    # --- Ordenar por fecha SOLO SI existe ---
-    if "Fecha" in df_mun.columns:
-        df_mun = df_mun.sort_values("Fecha")
-
-    # --- Detectar columna casos ---
-    posibles_casos = ["casos", "Casos", "n_casos"]
-    col_casos = next((c for c in posibles_casos if c in df_mun.columns), None)
-    if col_casos is None:
-        raise ValueError(f"No se encontró columna de casos. Columnas filtradas: {df_mun.columns.tolist()}")
-
-    return df_mun[col_casos].values.astype(float)
-
-
-def load_seir_params(path_json):
-    """
-    Carga parámetros optimizados del modelo SEIR desde un archivo JSON.
-
-    Se espera que el JSON tenga las claves:
-    - 'beta'
-    - 'sigma'
-    - 'gamma'
-    """
-    with open(path_json, "r", encoding="utf-8") as f:
-        params = json.load(f)
-
-    beta = params["beta"]
-    sigma = params["sigma"]
-    gamma = params["gamma"]
-    return beta, sigma, gamma
-
-
-# -------------------------
-# Script principal
-# -------------------------
-
-def main():
-    # Directorio raíz del proyecto
-    base_dir = Path(__file__).resolve().parents[1]
-
-    data_path = base_dir / "data" / "clean" / "chagas_prepared.csv"
-    params_path = base_dir / "models" / "seir_params.json"
-    output_path = base_dir / "models" / "lyapunov_valledupar.json"
-
-    # 1. Cargar serie para definir el horizonte de integración
-    serie_valledupar = load_series_for_municipio(data_path, municipio="VALLEDUPAR")
-    n_steps = max(len(serie_valledupar), 50)  # mínimo razonable de pasos
-
-    # 2. Cargar parámetros del modelo SEIR ya calibrado
-    beta, sigma, gamma = load_seir_params(params_path)
-
-    # 3. Definir estado inicial y población efectiva
-    N = 100_000  # población efectiva aproximada (ajustar si se desea)
+    N0 = p["N0"]
+    # Condiciones iniciales base (coherentes con simulate_seir)
     I0 = 1.0
     E0 = 0.0
     R0 = 0.0
-    S0 = N - I0 - E0 - R0
-    x0 = [S0, E0, I0, R0]
+    V0 = 1.0
+    S0 = N0 - I0 - E0 - R0
 
-    # 4. Calcular exponente de Lyapunov máximo
-    lyap_max = largest_lyapunov(
-        beta=beta,
-        sigma=sigma,
-        gamma=gamma,
-        N=N,
-        x0=x0,
-        n_steps=n_steps,
-        dt=1.0,
-        renorm_every=5,
+    y1 = np.array([S0, E0, I0, R0, V0], dtype=float)
+
+    # Perturbación inicial en la componente infecciosa, por ejemplo
+    v0 = np.array([0.0, 0.0, 1.0, 0.0, 0.0], dtype=float)
+    v0 = v0 / np.linalg.norm(v0) * delta0
+    y2 = y1 + v0
+
+    n_blocks = int(T_total / dt_block)
+    sum_logs = 0.0
+
+    distances = []
+    times = []
+
+    t_current = 0.0
+
+    for k in range(n_blocks):
+        t_next = t_current + dt_block
+
+        # Integrar trayectoria de referencia
+        _, Y1 = integrate_trajectory(y1, p, t_current, t_next, dt=1.0)
+        # Integrar trayectoria perturbada
+        _, Y2 = integrate_trajectory(y2, p, t_current, t_next, dt=1.0)
+
+        # Estado final de cada trayectoria
+        y1_final = Y1[:, -1]
+        y2_final = Y2[:, -1]
+
+        # Distancia entre trayectorias
+        diff = y2_final - y1_final
+        d = np.linalg.norm(diff)
+        if d == 0.0:
+            d = 1e-16  # evitar problemas numéricos
+
+        sum_logs += np.log(d / delta0)
+
+        distances.append(d)
+        times.append(t_next)
+
+        # Renormalizar perturbación alrededor de la trayectoria de referencia
+        v = diff / d * delta0
+        y1 = y1_final
+        y2 = y1_final + v
+
+        t_current = t_next
+
+    T = n_blocks * dt_block
+    lambda_max = sum_logs / T
+
+    results = pd.DataFrame({"t": times, "distancia": distances})
+
+    return float(lambda_max), results
+
+
+# --------------------- SCRIPT PRINCIPAL ---------------------
+
+def main():
+    print("Leyendo parámetros calibrados desde:", PARAMS_OPT_PATH)
+    with PARAMS_OPT_PATH.open() as f:
+        params_opt = json.load(f)
+
+    # Horizonte de integración (365 días por coherencia con la simulación)
+    T_total = 365.0
+    dt_block = 7.0
+    delta0 = 1e-5
+
+    lambda_max, dist_df = lyapunov_maximum(
+        params_opt,
+        T_total=T_total,
+        dt_block=dt_block,
+        delta0=delta0,
     )
 
-    # 5. Guardar resultado en JSON
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Exponente de Lyapunov máximo estimado: {lambda_max:.6f}")
+
+    # Guardar distancias en CSV
+    OUT_DIST_CSV.parent.mkdir(parents=True, exist_ok=True)
+    dist_df.to_csv(OUT_DIST_CSV, index=False)
+    print("Evolución de distancias guardada en:", OUT_DIST_CSV)
+
+    # Guardar resultado en JSON
+    OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     result = {
         "municipio": "Valledupar",
-        "lyapunov_max": float(lyap_max),
-        "n_steps": int(n_steps),
-        "beta": float(beta),
-        "sigma": float(sigma),
-        "gamma": float(gamma),
-        "N": int(N),
+        "lambda_max": float(lambda_max),
+        "T_total_days": float(T_total),
+        "dt_block_days": float(dt_block),
+        "delta0": float(delta0),
     }
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with OUT_JSON.open("w", encoding="utf-8") as f:
         json.dump(result, f, indent=4, ensure_ascii=False)
 
-    print(f"Exponente de Lyapunov máximo (Valledupar): {lyap_max:.6f}")
-    print(f"Resultado guardado en: {output_path}")
+    print("Resultado de Lyapunov guardado en:", OUT_JSON)
 
 
 if __name__ == "__main__":
