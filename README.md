@@ -222,7 +222,7 @@ Su propósito es facilitar la interpretación y transferencia de resultados haci
 ### Nota sobre la elaboración del proyecto
 Este proyecto fue elaborado por los autores y contó con asistencia de ChatGPT en la corrección, depuración, estandarización y adaptación del código Python, así como en la organización de notebooks, scripts, documentación técnica y estructuración del pipeline. La responsabilidad final sobre el diseño, decisiones metodológicas y contenido analítico es completamente de los autores.
 
-14. Fuentes de Datos
+## 14. Fuentes de Datos
 
 Los datos utilizados para la construcción del modelo SEIR, el ajuste epidemiológico y el cálculo del exponente de Lyapunov provienen del sistema oficial de vigilancia en salud pública de Colombia (SIVIGILA), administrado por el Instituto Nacional de Salud (INS). La información corresponde a los registros del evento Enfermedad de Chagas (Código 205) para el año 2024, obtenidos a través del portal oficial de consulta.
 
