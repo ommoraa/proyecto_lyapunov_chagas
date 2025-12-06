@@ -1,0 +1,7 @@
+{
+    "municipio": "Valledupar",
+    "lambda_max": 0.0010052416090316997,
+    "T_total_days": 365.0,
+    "dt_block_days": 7.0,
+    "delta0": 1e-05
+}
