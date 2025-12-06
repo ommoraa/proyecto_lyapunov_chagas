@@ -82,6 +82,9 @@ def rmse(params, casos_reales, N, I0, E0, R0):
 def main():
     base_dir = Path(__file__).resolve().parents[1]
 
+    # Semilla para reproducibilidad (aunque el modelo es determinístico)
+    np.random.seed(42)
+
     data_path = base_dir / "data" / "clean" / "chagas_prepared.csv"
     params_path = base_dir / "models" / "seir_params.json"
     sim_path = base_dir / "reports" / "seir_simulation.csv"
@@ -96,9 +99,11 @@ def main():
     ].copy()
 
     if df_mun.empty:
-        raise ValueError(f"No se encontraron registros para {municipio_objetivo} en {data_path}")
+        raise ValueError(
+            f"No se encontraron registros para {municipio_objetivo} en {data_path}"
+        )
 
-    # Asegurar que haya columna Fecha; si no, usamos un índice simple
+    # Asegurar que haya columna Fecha; si no, usamos ANO+SEMANA
     if "Fecha" in df_mun.columns:
         df_mun = df_mun.sort_values("Fecha")
         fechas = pd.to_datetime(df_mun["Fecha"])
@@ -111,7 +116,7 @@ def main():
     casos = df_mun["casos"].astype(float).values
     n_steps = len(casos)
 
-    # 2. Definir condiciones iniciales y parámetros de población
+    # 2. Condiciones iniciales y población
     N = 100_000  # población efectiva aproximada
     I0 = max(1.0, casos[0])
     E0 = I0
@@ -173,22 +178,32 @@ def main():
     # 7. Registro en MLflow (si está disponible)
     if MLFLOW_AVAILABLE:
         mlflow.set_experiment("chagas_seir_valledupar")
-        with mlflow.start_run(run_name="calibracion_seir_valledupar"):
+
+        with mlflow.start_run(run_name="calibracion_seir_valledupar") as run:
             # Parámetros
             mlflow.log_param("municipio", municipio_objetivo.title())
             mlflow.log_param("N", int(N))
-            mlflow.log_param("beta", float(beta_opt))
-            mlflow.log_param("sigma", float(sigma_opt))
-            mlflow.log_param("gamma", float(gamma_opt))
+            mlflow.log_param("n_steps", n_steps)
+            mlflow.log_param("I0", float(I0))
+            mlflow.log_param("E0", float(E0))
+            mlflow.log_param("R0", float(R0))
+            mlflow.log_param("beta_opt", float(beta_opt))
+            mlflow.log_param("sigma_opt", float(sigma_opt))
+            mlflow.log_param("gamma_opt", float(gamma_opt))
 
-            # Métricas
+            # Métrica principal
             mlflow.log_metric("rmse", float(rmse_final))
 
             # Artefactos principales
             mlflow.log_artifact(str(params_path), artifact_path="models")
             mlflow.log_artifact(str(sim_path), artifact_path="reports")
 
-            # Figura simple de ajuste observados vs simulados
+            # Guardar también la simulación completa como JSON
+            sim_json_path = sim_path.with_suffix(".json")
+            df_sim.to_json(sim_json_path, orient="records", date_format="iso")
+            mlflow.log_artifact(str(sim_json_path), artifact_path="simulations")
+
+            # Figura observados vs simulados
             try:
                 fig, ax = plt.subplots(figsize=(6, 4))
                 ax.plot(df_sim["Fecha"], df_sim["casos_reales"], label="Casos reales")
@@ -198,7 +213,8 @@ def main():
                 ax.legend()
                 ax.grid(True, alpha=0.3)
 
-                mlflow.log_figure(fig, "figures/ajuste_seir_valledupar.png")
+                figure_path = "figures/ajuste_seir_valledupar.png"
+                mlflow.log_figure(fig, figure_path)
                 plt.close(fig)
             except Exception as e:  # pragma: no cover
                 print(f"No fue posible registrar la figura en MLflow: {e}")

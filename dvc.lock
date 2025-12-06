@@ -41,8 +41,8 @@ stages:
       size: 25015
     - path: src/calibrate_seir.py
       hash: md5
-      md5: 5a2aceb52a120b94d650afc652a6607c
-      size: 5340
+      md5: ff2f2cd3a1747324a065f225d98649d5
+      size: 6993
     outs:
     - path: models/seir_params.json
       hash: md5
